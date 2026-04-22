@@ -1,0 +1,8 @@
+requests
+pyyaml>=5.0
+rich>=10.0.0
+qrcode>=7.0.0
+
+[dev]
+pytest>=6.0.0
+pyinstaller>=5.0.0

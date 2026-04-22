@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=40.6.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xinglian-ssl-client"
+version = "1.0.0"
+description = "星链下载SSL证书客户端 - 支持Windows/Linux/macOS"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Cockleshell", email = "support@cockleshell.cn"}
+]
+keywords = ["ssl", "certificate", "https", "letsencrypt"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Systems Administration",
+]
+
+dependencies = [
+    "requests>=2.28.0",
+    "pyyaml>=6.0",
+    "rich>=13.0.0",
+    "qrcode>=7.4.0",
+    "dnspython>=2.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "pyinstaller>=6.0.0",
+]
+
+[project.scripts]
+xinglian-ssl = "ssl_client.main:main"
+
+[project.urls]
+Homepage = "https://www.cockleshell.cn"
+Repository = "https://github.com/cockleshell/xinglian-ssl-client"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ssl_client = ["py.typed"]

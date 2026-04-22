@@ -1,0 +1,22 @@
+Metadata-Version: 2.1
+Name: xinglian-ssl-client
+Version: 1.0.0
+Summary: 星链下载SSL证书客户端 - 支持Windows/Linux/macOS
+Home-page: UNKNOWN
+Author: Cockleshell
+Author-email: support@cockleshell.cn
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Security
+Classifier: Topic :: System :: Systems Administration
+Requires-Python: >=3.6
+Provides-Extra: dev
+
+UNKNOWN
+
