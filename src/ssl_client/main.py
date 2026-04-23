@@ -132,18 +132,35 @@ def main():
             break
 
     # ==================== 第5步：根据类型走不同流程 ====================
+    result = None
     if cert_type == 'single':
-        _handle_single_cert(
+        result = _handle_single_cert(
             config, api, cert_mgr, nginx_mgr, installer,
             domain, prefix, full_domain
         )
     else:
-        _handle_wildcard_cert(
+        result = _handle_wildcard_cert(
             config, api, cert_mgr, installer,
             domain, full_domain
         )
 
-    console.print("\n[bold green]✓ 证书申请流程完成！[/bold green]")
+    if result and result.get('status') == 'completed':
+        # 查询用户剩余金币
+        try:
+            remaining_coins = api.get_coins()
+            required_coins = SINGLE_CERT_COINS if cert_type == 'single' else WILDCARD_CERT_COINS
+            console.print(f"\n[bold green]✓ 证书申请流程完成！[/bold green]")
+            console.print(f"[yellow]本次扣除: {required_coins} 金币，剩余金币: {remaining_coins}[/yellow]")
+        except Exception:
+            console.print(f"\n[bold green]✓ 证书申请流程完成！[/bold green]")
+    elif result and result.get('status') == 'error':
+        console.print(f"\n[red]✗ 证书申请失败！[/red]")
+        if result.get('coins_deducted'):
+            remaining_coins = api.get_coins()
+            console.print(f"[yellow]金币已被扣除: {WILDCARD_CERT_COINS if cert_type == 'wildcard' else SINGLE_CERT_COINS}，剩余金币: {remaining_coins}[/yellow]")
+            console.print("[dim]如需重试，请使用: xinglian-ssl restart {task_id}[/dim]")
+    else:
+        console.print(f"\n[bold green]✓ 证书申请流程完成！[/bold green]")
     console.print("[dim]感谢使用星链下载SSL证书客户端[/dim]")
 
 
@@ -156,8 +173,12 @@ def _handle_single_cert(
     domain: str,
     prefix: str,
     full_domain: str,
-):
-    """处理单域名证书流程（HTTP验证 + Nginx反向代理）"""
+) -> dict:
+    """处理单域名证书流程（HTTP验证 + Nginx反向代理）
+
+    Returns:
+        任务结果字典 {status, error_msg, ...}
+    """
     console.print(f"\n[bold cyan]📋 单域名证书申请流程[/bold cyan]")
     console.print(f"[dim]需要域名 {full_domain} 解析到本机才能完成HTTP验证[/dim]")
 
@@ -180,12 +201,12 @@ def _handle_single_cert(
         )
         if choice.lower() != 'y':
             console.print("[yellow]程序退出[/yellow]")
-            sys.exit(0)
+            return {'status': 'cancelled', 'error_msg': '用户退出'}
 
         # 轮询等待解析
         if not wait_for_domain_resolution(full_domain):
             console.print("[red]域名解析超时，程序退出[/red]")
-            sys.exit(1)
+            return {'status': 'cancelled', 'error_msg': '域名解析超时'}
 
     # 配置Nginx反向代理
     console.print(f"\n[cyan]正在配置Nginx反向代理...[/cyan]")
@@ -216,21 +237,21 @@ def _handle_single_cert(
             )
             if choice.lower() != 'y':
                 console.print("[yellow]程序退出[/yellow]")
-                sys.exit(0)
+                return {'status': 'cancelled', 'error_msg': '用户退出'}
 
             # 让用户手动验证
             if not verify_reverse_proxy(full_domain):
                 console.print("[red]反向代理验证失败，程序退出[/red]")
-                sys.exit(1)
+                return {'status': 'error', 'error_msg': '反向代理验证失败', 'coins_deducted': False}
         else:
-            sys.exit(1)
+            return {'status': 'error', 'error_msg': 'Nginx反向代理配置失败', 'coins_deducted': False}
 
     # 申请证书
     task_id = cert_mgr.apply_single_cert(domain, prefix)
     if task_id is None:
         # 清理Nginx配置
         nginx_mgr.cleanup_acme_proxy()
-        sys.exit(1)
+        return {'status': 'error', 'error_msg': '证书申请提交失败', 'coins_deducted': False}
 
     # 轮询状态
     result = cert_mgr.poll_task_status(task_id)
@@ -245,14 +266,18 @@ def _handle_single_cert(
             if extract_dir:
                 installer.print_cert_info(extract_dir, full_domain)
                 console.print("[green]证书安装成功！[/green]")
+        result['coins_deducted'] = True
     else:
         error_msg = result.get('error_msg', '未知错误')
         console.print(f"[red]证书申请失败: {error_msg}[/red]")
+        result['coins_deducted'] = False
 
     # 清理Nginx配置
     console.print(f"\n[cyan]正在清理Nginx配置...[/cyan]")
     nginx_mgr.cleanup_acme_proxy()
     console.print("[green]✓ Nginx配置已清理[/green]")
+
+    return result
 
 
 def _handle_wildcard_cert(
@@ -262,8 +287,12 @@ def _handle_wildcard_cert(
     installer: CertInstaller,
     domain: str,
     full_domain: str,
-):
-    """处理泛域名证书流程（DNS验证）"""
+) -> dict:
+    """处理泛域名证书流程（DNS验证）
+
+    Returns:
+        任务结果字典 {status, error_msg, ...}
+    """
     console.print(f"\n[bold cyan]📋 泛域名证书申请流程[/bold cyan]")
     console.print("[dim]泛域名证书需要通过DNS验证，支持以下DNS服务商：[/dim]")
     console.print("  1. 阿里云DNS (Aliyun)")
@@ -318,7 +347,7 @@ def _handle_wildcard_cert(
         dns_key_secret=dns_key_secret if dns_provider != 'cloudflare' else dns_key_id,
     )
     if task_id is None:
-        sys.exit(1)
+        return {'status': 'error', 'error_msg': '证书申请提交失败', 'coins_deducted': False}
 
     # 轮询状态
     result = cert_mgr.poll_task_status(task_id)
@@ -333,9 +362,13 @@ def _handle_wildcard_cert(
             if extract_dir:
                 installer.print_cert_info(extract_dir, full_domain)
                 console.print("[green]证书安装成功！[/green]")
+        result['coins_deducted'] = True
     else:
         error_msg = result.get('error_msg', '未知错误')
         console.print(f"[red]证书申请失败: {error_msg}[/red]")
+        result['coins_deducted'] = False
+
+    return result
 
 
 def _get_dns_credentials(config: Config, provider: str):

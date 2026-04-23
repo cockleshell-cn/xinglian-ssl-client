@@ -137,13 +137,23 @@ class APIClient:
 
     def download_certificate(self, task_id: int, save_path: str) -> str:
         """下载证书到指定路径，返回文件路径"""
-        response = self._request_raw(
+        # Step 1: 获取下载链接（返回JSON包含download_url）
+        response = self._request(
             'GET',
             f'/ssl/download/{task_id}',
             params={'api_token': self.config.api_token}
         )
+        download_url = response.get('download_url')
+        if not download_url:
+            raise APIError(500, "服务器未返回下载链接")
+
+        # Step 2: 使用完整URL下载真实的zip文件
+        full_url = self.base_url.replace('/api', '') + download_url
+        file_response = self.session.request('GET', full_url)
+        if file_response.status_code >= 400:
+            raise APIError(f"下载失败: {file_response.status_code}")
         with open(save_path, 'wb') as f:
-            f.write(response.content)
+            f.write(file_response.content)
         return save_path
 
     # ==================== 支付相关 ====================
